@@ -5,6 +5,8 @@ from config import config
 from extensions import db, login_manager, migrate
 
 def create_app(config_name='default'):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'production')
     """Application factory pattern."""
     app = Flask(__name__)
     app.config.from_object(config[config_name])
