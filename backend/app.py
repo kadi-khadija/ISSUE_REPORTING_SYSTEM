@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from config import config
@@ -52,6 +53,7 @@ def create_app(config_name='default'):
         db.create_all()
 
         # Auto-create admin if not exists (with email_verified=True for seeded accounts)
+               # Auto-create admin if not exists (with email_verified=True for seeded accounts)
         from models import User
         if not User.query.filter_by(role='admin').first():
             admin = User(
@@ -59,12 +61,40 @@ def create_app(config_name='default'):
                 email='admin@admin.com',
                 full_name='System Admin',
                 role='admin',
-                email_verified=True  # Admin accounts are pre-verified
+                email_verified=True
             )
             admin.set_password('admin')
             db.session.add(admin)
             db.session.commit()
             print("Default admin created - Username: admin, Password: admin")
+
+        # Auto-create commune admins from communes.json
+        communes_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'communes.json')
+        if os.path.exists(communes_file):
+            with open(communes_file, 'r', encoding='utf-8') as f:
+                communes_data = json.load(f)
+                admins_config = communes_data.get('admins', {})
+                communes_map = communes_data.get('communes', {})
+                created = 0
+                for email, zipcode in admins_config.items():
+                    if User.query.filter_by(email=email).first():
+                        continue
+                    commune_name = communes_map.get(zipcode, 'Unknown')
+                    admin_user = User(
+                        username=email.split('@')[0],
+                        email=email,
+                        full_name=f"APC {commune_name}",
+                        role='admin',
+                        zipcode=zipcode,
+                        is_active=True,
+                        email_verified=True
+                    )
+                    admin_user.set_password('Boumerdes_2026!')
+                    db.session.add(admin_user)
+                    created += 1
+                if created > 0:
+                    db.session.commit()
+                    print(f"Created {created} commune admin accounts")
 
     return app
 
