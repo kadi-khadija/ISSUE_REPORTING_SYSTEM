@@ -205,27 +205,59 @@ def get_all_users():
 @admin_required
 def update_user(user_id):
     user = User.query.get(user_id)
-    
+
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    
+
+    if user.id == current_user.id:
+        return jsonify({'error': 'You cannot modify your own account'}), 400
+
     data = request.get_json()
-    
+
     if not data:
         return jsonify({'error': 'No data provided'}), 400
-    
+
     if 'role' in data and data['role'] in ['citizen', 'admin']:
         user.role = data['role']
-    
+
     if 'is_active' in data:
         user.is_active = bool(data['is_active'])
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'message': 'User updated successfully',
         'user': user.to_dict()
     }), 200
+
+
+@admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.id == current_user.id:
+        return jsonify({'error': 'You cannot delete your own account'}), 400
+
+    # Delete user's issues and related data
+    for issue in user.issues.all():
+        for image in issue.images.all():
+            db.session.delete(image)
+        for history in issue.status_history.all():
+            db.session.delete(history)
+        db.session.delete(issue)
+
+    for history in user.status_changes.all():
+        db.session.delete(history)
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({'message': 'User deleted successfully'}), 200
 
 
 @admin_bp.route('/stats', methods=['GET'])
